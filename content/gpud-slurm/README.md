@@ -1,18 +1,24 @@
-# Slurm Cluster Setup with GPU Monitoring
 
-__GPUd:__ GPUd is a lightweight real-time monitor of your cluster's GPUs. It detects and reports hardware and system-level issues, enabling earlier signaling of downtime.
+## Slurm Cluster Setup with GPU Monitoring
 
-__Lepton AI:__ Lepton AI integrates with GPUd to offer a dashboard for monitoring GPU health and performance across your cluster.
+This guide will walk you through setting up a Slurm cluster on Crusoe Cloud and integrating GPUd for monitoring and Lepton AI for dashboarding.
+
+**GPUd:** GPUd is a lightweight, real-time monitor for your cluster's GPUs. It detects and reports hardware and system-level issues, enabling earlier signaling of downtime.
+
+**Lepton AI:** Lepton AI integrates with GPUd to offer a centralized dashboard for monitoring GPU health and performance across your cluster.
 
 ## Foundations
 
-### Clone the Slurm Crusoe Template project
+### 1. Clone the Slurm Crusoe Template Project
 
 ```bash
 git clone https://github.com/crusoecloud/slurm.git
+cd slurm
 ```
 
-### Populate `~/.crusoe/config`
+### 2. Populate `~/.crusoe/config`
+
+Create or modify your `~/.crusoe/config` file with your Crusoe Cloud credentials:
 
 ```properties
 [default]
@@ -21,8 +27,11 @@ default_project = "default"
 secret_key = "your_secret_key"
 ```
 
-### Modify the example under `slurm/examples/example.tfvars`
+**Note:** Replace `"your_access_key"` and `"your_secret_key"` with your actual Crusoe Cloud access key and secret key.
 
+### 3. Modify the Example `slurm/examples/example.tfvars`
+
+Customize the `slurm/examples/example.tfvars` file with your specific cluster configuration:
 
 ```terraform
 location = "your_cluster_location"
@@ -41,14 +50,16 @@ slurm_compute_node_count = 1
 
 slurm_users = [{
   name = "your.name"
-  uid = 1001 
+  uid = 1001
   ssh_pubkey = "ssh-rsa KEY00001 your.name@localhost"
 }]
 ```
 
+**Note:** Replace the placeholder values with your actual Crusoe Cloud location, project ID, SSH public key path, VPC subnet ID, and desired node configurations.
 
-### Install Ansible on the Controller Machine
+### 4. Install Ansible on the Controller Machine
 
+Ansible is required to automate the installation of GPUd. Install it on your local machine or a designated controller machine.
 
 **Debian/Ubuntu:**
 
@@ -69,8 +80,9 @@ sudo yum install ansible
 brew install ansible
 ```
 
-### Initialize and Apply Terraform
+### 5. Initialize and Apply Terraform
 
+Initialize and apply the Terraform configuration to create your Slurm cluster:
 
 ```bash
 terraform init
@@ -79,9 +91,9 @@ terraform apply
 
 ## GPUd Installation and Configuration
 
+### 1. Create an Ansible Playbook `./gpud_install.yml`
 
-### Create an Ansible Playbook `./gpud_install.yml`
-
+Create a new file named `gpud_install.yml` with the following content:
 
 ```yaml
 ---
@@ -119,23 +131,29 @@ terraform apply
         - name: Display gpud install output
           debug:
             msg: "{{ gpud_install_output.stdout }}"
-
 ```
 
-### Configure Ansible Inventory
+### 2. Configure Ansible Inventory
+
+Generate an Ansible inventory file (`hosts.ini`) containing the public IP addresses of your Slurm nodes:
 
 ```bash
 crusoe compute vms list -f json | jq -r '.[] | "\(.name) ansible_host=\(.network_interfaces[0].ips[0].public_ipv4.address)"' > ./hosts.ini
 ```
 
-### Run the Ansible Playbook
+### 3. Run the Ansible Playbook
 
-### Local Dashboards Only
+#### Local Dashboards Only
+
+To install GPUd and access the local dashboards, run the following command:
+
 ```bash
-ansible-playbook -i ./hosts.ini ./gpud_install.yml 
+ansible-playbook -i ./hosts.ini ./gpud_install.yml
 ```
 
 #### Local Dashboard Access
+
+After running the playbook, you can access the local GPUd dashboard by creating an SSH tunnel.
 
 _Assuming `204.52.16.221` is the public IP address of a Slurm node_
 
@@ -143,13 +161,19 @@ _Assuming `204.52.16.221` is the public IP address of a Slurm node_
 ssh -f your.name@204.52.16.221 -L 15132:localhost:15132 -N
 ```
 
-open a web browser and navigate to `http://localhost:15132`.
+Then, open a web browser and navigate to `http://localhost:15132`.
 
+#### Using Lepton.ai
 
-### Using Lepton.ai
+To integrate with Lepton AI, you need to provide your Lepton AI token:
+
 ```bash
 ansible-playbook -i ./hosts.ini ./gpud_install.yml -e "lepton_ai_token=<YOUR_LEPTON_AI_TOKEN>"
 ```
+
+**Note:** Replace `<YOUR_LEPTON_AI_TOKEN>` with your actual Lepton AI token.
+
 #### Connect to Lepton.ai Dashboard
 
-If you provided a Lepton AI token, your nodes should now be connected to your Lepton AI dashboard. You can view the GPU metrics in the Lepton AI dashboard under Utilities -> Machines.
+If you provided a Lepton AI token, your nodes should now be connected to your Lepton AI dashboard. You can view the GPU metrics in the Lepton AI dashboard under **Utilities -> Machines**.
+
